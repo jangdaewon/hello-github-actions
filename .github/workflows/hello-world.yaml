@@ -2,11 +2,72 @@ name: Hello World
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 9 * * *"  # 매일 UTC 09:00
+    - cron: "*/5 * * * *"  # 매 5분마다 (UTC)
+  push:
+    branches:
+#      - main
+      - develop
+    paths:
+      - "src/main/java/**"
 
 jobs:
   hello:
     runs-on: ubuntu-latest
     steps:
       - name: Say Hello
-        run: echo "Hello, GitHub Actions!"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          ACTOR: ${{ github.actor }}
+          WORKFLOW: ${{ github.workflow }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "Hello, GitHub Actions!"
+          echo "Now (UTC): $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+          echo ""
+          echo "=== Trigger summary ==="
+          echo "event_name : ${EVENT_NAME}"   # push / schedule / workflow_dispatch / pull_request ...
+          echo "actor      : ${ACTOR}"
+          echo "repo       : ${REPO}"
+          echo "workflow   : ${WORKFLOW}"
+          echo "run_id     : ${RUN_ID}"
+          echo "run_number : ${RUN_NUMBER}"
+          echo "run_attempt: ${RUN_ATTEMPT}"
+          echo ""
+          echo "=== Git ref info ==="
+          echo "branch     : ${BRANCH}"
+          echo "ref        : ${REF}"
+          echo "sha        : ${SHA}"
+          echo ""
+          echo "=== Event-specific hints ==="
+          case "${EVENT_NAME}" in
+            push)
+              echo "Triggered by: push"
+              echo "pusher     : ${{ github.event.pusher.name }}"
+              echo "sender     : ${{ github.event.sender.login }}"
+              echo "before     : ${{ github.event.before }}"
+              echo "after      : ${{ github.event.after }}"
+              ;;
+            schedule)
+              echo "Triggered by: schedule"
+              # schedule 이벤트는 별도 payload가 거의 없고, 보통 기본 브랜치 ref로 실행됩니다.
+              ;;
+            workflow_dispatch)
+              echo "Triggered by: manual (workflow_dispatch)"
+              echo "inputs     : ${{ toJson(github.event.inputs) }}"
+              ;;
+            *)
+              echo "Triggered by: ${EVENT_NAME}"
+              ;;
+          esac
+
+      - name: Dump full event payload (JSON)
+        # 민감정보가 포함될 수 있어 필요하면 제거/마스킹하세요.
+        run: |
+          echo "=== github.event (full payload) ==="
+          echo '${{ toJson(github.event) }}'
